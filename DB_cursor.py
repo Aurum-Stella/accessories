@@ -27,10 +27,10 @@ def get_conn_src_dst() -> psycopg2.connect:
 
 def queryng_sql(cursor, data, sql_file):
     fetch_loan_ids_query = read_sql_file(os.path.join(current_dir, "sql", sql_file))
-    if data:
+    if len(data[0]) > 1:
         cursor.executemany(fetch_loan_ids_query, data)
-    else:
-        cursor.execute(fetch_loan_ids_query)
+    elif len(data[0]) <= 1:
+        cursor.execute(fetch_loan_ids_query, data)
 
 
 
@@ -38,12 +38,13 @@ def queryng_sql(cursor, data, sql_file):
 
 def connection_to_db(input_data, sql_file):
     print(f'-- Processed;')
-    print(input_data)
     conn_src_f = get_conn_src_dst()
     with conn_src_f.cursor() as cursor_facade:
+        
         queryng_sql(cursor_facade, input_data, sql_file)
         try:
             return_data = cursor_facade.fetchall()
+            print(return_data, 'data')
             return return_data
         except:
             pass
