@@ -27,16 +27,18 @@ def get_conn_src_dst() -> psycopg2.connect:
 
 def queryng_sql(cursor, data, sql_file):
     fetch_loan_ids_query = read_sql_file(os.path.join(current_dir, "sql", sql_file))
-    if len(data[0]) > 1:
-        cursor.executemany(fetch_loan_ids_query, data)
-    elif len(data[0]) <= 1:
-        cursor.execute(fetch_loan_ids_query, data)
+    # if len(data[0]) > 1:
+    #     cursor.executemany(fetch_loan_ids_query, data)
+        
+    # elif len(data[0]) <= 1:
+    cursor.execute(fetch_loan_ids_query, data)
 
 
 
 
 
 def connection_to_db(input_data, sql_file):
+    print(input_data)
     print(f'-- Processed;')
     conn_src_f = get_conn_src_dst()
     with conn_src_f.cursor() as cursor_facade:
@@ -50,5 +52,6 @@ def connection_to_db(input_data, sql_file):
             pass
         finally:
             conn_src_f.commit() 
+
 
 

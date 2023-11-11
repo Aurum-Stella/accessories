@@ -124,7 +124,7 @@ def process_total_cost_step(message):
     try:
         input_text = float(message.text)
         list_for_database.append(input_text)
-        DB_cursor.connection_to_db([tuple(list_for_database)], 'write_material.sql')
+        DB_cursor.connection_to_db(tuple(list_for_database), 'write_material.sql')
         bot.send_message(message.chat.id, 
 f'''
 ● Назва: {list_for_database[0]}
@@ -148,7 +148,7 @@ f'''
 # Обработчик для кнопки "Видалити матеріал"
 @bot.message_handler(func=lambda message: message.text == 'Видалити матеріал')
 def send_remainder_material(message):
-    text = DB_cursor.connection_to_db([('-1', )], 'show_material.sql')
+    text = DB_cursor.connection_to_db(('-1', ), 'show_material.sql')
 
     header = ["ID", "Назва", "Розмір", "Натуральний", "Залишок", "Загальна ціна по залишку", "Ціна за шт"]
     table = tabulate(text, headers=header, tablefmt="plain")
@@ -163,7 +163,7 @@ def deleted_id_material(message):
         list_for_database.clear()
         return
     else:
-        DB_cursor.connection_to_db([(input_text)], 'deleted_material.sql')
+        DB_cursor.connection_to_db((input_text, ), 'deleted_material.sql')
         bot.send_message(message.chat.id, f"ID {input_text} Видалено", parse_mode="Markdown")
 
 
@@ -230,18 +230,21 @@ def ask_question_price(message):
         return
     try:
         input_text = float(message.text)
+        print(list_for_database, 'запись')
+        list_for_database.append(input_text)
+        id_product = DB_cursor.connection_to_db(tuple(list_for_database), 'write_product.sql')
         send_remainder_material(message)
         msg = bot.send_message(message.chat.id, f"Використаний матеріал. Формат ID к-сть, ID к-сть ...")
-        bot.register_next_step_handler(msg, asc_material_used)
-        list_for_database.append(input_text)
-        print(list_for_database)
+        print(list_for_database, 'ошибка тут')
+
+        bot.register_next_step_handler(msg, lambda m: asc_material_used(m, id_product[0][0], list_for_database[1]))
 
     except ValueError:
         msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
         bot.register_next_step_handler(msg, ask_question_price)
 
 
-def asc_material_used(message):
+def asc_material_used(message, id_product, date_product):
     input_text = message.text
     if input_text.lower() == 'стоп':
         list_for_database.clear()
@@ -250,39 +253,32 @@ def asc_material_used(message):
     pattern = re.compile(r'^(\d+\s\d+,\s)*\d+\s\d+$')
     # Проверка соответствия строки формату
     if not pattern.match(input_text):
-        msg = bot.send_message(message.chat.id, 'Формат дати введений не коректно. Спробуйте ще раз')
+        msg = bot.send_message(message.chat.id, 'Формат введений не коректно. Спробуйте ще раз')
         bot.register_next_step_handler(msg, asc_material_used)
     else:
-        
-        print(list_for_database, 'list')
-        list_for_database.append([tuple(map(int, pair.strip().split())) for pair in input_text.split(',')])
+        list_for_database.clear()    
+        print(list_for_database, 'проверка')
+        list_for_database.extend([tuple(map(int, pair.split())) + (id_product, date_product) for pair in input_text.split(', ')])
+        print(list_for_database, 'проверка после')
         try:
-            for i in range(len(list_for_database[3])):
+            for i in list_for_database:
+                print(list_for_database, 'записываем')
+                DB_cursor.connection_to_db(i, 'sold_material.sql')
+    
+            sold_product = DB_cursor.connection_to_db((id_product, ),'show_sold_product.sql')
+            old_material = DB_cursor.connection_to_db((id_product, ),'show_sold_material.sql')
+            print(sold_product)
+            print(old_material)
+            
 
+            product_info = f"**Проданный товар:**\n- ID: {sold_product[0][0]}\n- Тип: {sold_product[0][1]}\n- Дата продажи: {sold_product[0][2]}\n- Себестоимость: {sold_product[0][3]}\n- Цена продажи: {sold_product[0][4]}\n\n**Используемые материалы:**"
 
-                print(list_for_database, 'то что нужно')
+            for material in old_material:
+                product_info += f"\n\n- ID материала: {material[0]}\n- Название: {material[1]}\n- Количество: {material[2]}"
 
-
-                result = DB_cursor.connection_to_db([(list_for_database[3][i][0], )], 'show_material.sql')
-
-
-                id_name_count_product[result[0][0]] = [result[0][1], str(list_for_database[3][i][1]) + ' шт.']
-
-                DB_sold_product.connection_to_db(list_for_database)
-
-                materials = "\n".join([f"ID: {id}; {name[0]}; {name[1]}" for id, name in id_name_count_product.items()])
-                # Создаем таблицу
-
-                table_data = [
-                    ["Тип", list_for_database[0]],
-                    ["Дата", list_for_database[1]],
-                    ["Ціна", list_for_database[2]],
-                    ["Матеріал", materials]
-                ]
-                table = tabulate(table_data, tablefmt="plain")
-                print(list_for_database)
-
-            bot.send_message(message.chat.id, f"```\n{table}\n```", parse_mode="Markdown")
+            bot.send_message(message.chat.id, product_info)
+            list_for_database.clear()
+            list_for_database.append('Браслет')
             msg = bot.send_message(message.chat.id, 'Дата продажу dd mm yyyy')  # сразу переходим к следующему шагу
             bot.register_next_step_handler(msg, ask_question_date)
         except:
