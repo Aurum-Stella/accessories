@@ -96,13 +96,13 @@ def process_natural_step(message):
         input_text = int(message.text)
         list_for_database.append(input_text)
         msg = bot.send_message(message.chat.id, f"Кількість")
-        bot.register_next_step_handler(msg, process_quantity_step)
+        bot.register_next_step_handler(msg, process_quantity_material_step)
     except ValueError:
         msg = bot.send_message(message.chat.id, 'Введіть ціле число. Спробуйте ще раз:')
         bot.register_next_step_handler(msg, process_natural_step)
 
 
-def process_quantity_step(message):
+def process_quantity_material_step(message):
     input_text = message.text
     if input_text.lower() == 'стоп':
         list_for_database.clear()
@@ -114,7 +114,7 @@ def process_quantity_step(message):
         bot.register_next_step_handler(msg, process_photo)
     except ValueError:
         msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
-        bot.register_next_step_handler(msg, process_quantity_step)
+        bot.register_next_step_handler(msg, process_quantity_material_step)
 
 
 def process_photo(message):
