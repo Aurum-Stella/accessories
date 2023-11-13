@@ -38,7 +38,7 @@ def queryng_sql(cursor, data, sql_file):
 
 
 def connection_to_db(input_data, sql_file):
-    print(input_data)
+    # print(input_data)
     print(f'-- Processed;')
     conn_src_f = get_conn_src_dst()
     with conn_src_f.cursor() as cursor_facade:
@@ -46,12 +46,11 @@ def connection_to_db(input_data, sql_file):
         queryng_sql(cursor_facade, input_data, sql_file)
         try:
             return_data = cursor_facade.fetchall()
-            print(return_data, 'data')
+            # print(return_data, 'data')
             return return_data
         except:
             pass
         finally:
             conn_src_f.commit() 
-
 
 

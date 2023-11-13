@@ -8,7 +8,9 @@ SELECT id,
        is_natural,
        quantity_in_stock,
        total_cost,
-       price_for_one_unit
+       price_for_one_unit,
+       zodiac_sign,
+       photo
 
 FROM material
 WHERE id = (SELECT val FROM placeholder) OR (SELECT val FROM placeholder) = -1

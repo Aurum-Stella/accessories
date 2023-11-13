@@ -9,13 +9,7 @@ write_material as(
 )
 select * from write_product, write_material;
 
-UPDATE product_sold
-SET prime_cost = (
-    SELECT sum(price_for_one_unit)
-    FROM product_sold ps
-    LEFT JOIN material_sold ms ON ps.id = ms.product_id
-    LEFT JOIN material m ON m.id = ms.material_id
-)
+
 
 
 

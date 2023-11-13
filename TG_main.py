@@ -24,7 +24,8 @@ import os
 from dotenv import load_dotenv
 from tabulate import tabulate
 import DB_cursor
-import DB_sold_product
+import io
+
 import re
 
 load_dotenv()
@@ -109,11 +110,44 @@ def process_quantity_step(message):
     try:
         input_text = int(message.text)
         list_for_database.append(input_text)
-        msg = bot.send_message(message.chat.id, f"Загальна ціна вказаної кількості")
-        bot.register_next_step_handler(msg, process_total_cost_step)
+        msg = bot.send_message(message.chat.id, f"Оберіть фото")
+        bot.register_next_step_handler(msg, process_photo)
     except ValueError:
         msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
         bot.register_next_step_handler(msg, process_quantity_step)
+
+
+def process_photo(message):
+    try:
+        # Получение ID файла фото
+        file_id = message.photo[-1].file_id
+        # Получение информации о файле
+        file_info = bot.get_file(file_id)
+        # Скачивание файла
+        downloaded_file = bot.download_file(file_info.file_path)
+        list_for_database.append(downloaded_file)
+        msg = bot.send_message(message.chat.id, f"Вкажіть знак зодіаку!")
+        bot.register_next_step_handler(msg, process_zodiac_step)  # Замените process_next_step на следующий шаг в вашем процессе
+        # print(list_for_database)
+    except AttributeError:
+        msg = bot.send_message(message.chat.id, 'Будь ласка відправте фото. Спробуйте ще раз.')
+        bot.register_next_step_handler(msg, process_photo)
+
+
+def process_zodiac_step(message):
+    input_text = message.text
+    if input_text.lower() == 'стоп':
+        list_for_database.clear()
+        return    
+    try:
+        input_text = message.text
+        list_for_database.append(input_text)
+        msg = bot.send_message(message.chat.id, f"Вкажіть загальну ціну за вказану кількість метеріалу")
+        bot.register_next_step_handler(msg, process_total_cost_step)
+    except ValueError:
+        msg = bot.send_message(message.chat.id, 'Сталась помилка, спробуйте ще раз')
+        bot.register_next_step_handler(msg, process_zodiac_step)
+
 
 
 def process_total_cost_step(message):
@@ -124,6 +158,7 @@ def process_total_cost_step(message):
     try:
         input_text = float(message.text)
         list_for_database.append(input_text)
+        print(len(list_for_database))
         DB_cursor.connection_to_db(tuple(list_for_database), 'write_material.sql')
         bot.send_message(message.chat.id, 
 f'''
@@ -131,8 +166,14 @@ f'''
 ● Розмір: {list_for_database[1]}
 ● Натуральність: {list_for_database[2]}
 ● Кількість: {list_for_database[3]}
-● Загальна вартість: {list_for_database[4]}
+● Загальна вартість: {list_for_database[5]}
+● Знак зодіаку: {list_for_database[5]}
   був створений.''')
+        # Преобразование бинарных данных в байтовый поток
+        photo_stream = io.BytesIO(list_for_database[4])
+
+        # Отправка файла
+        bot.send_photo(message.chat.id, photo_stream)
         list_for_database.clear()  # очистити список для наступного вводу
         msg = bot.send_message(message.chat.id, "Назва:")  # повернутися до початкового кроку
         bot.register_next_step_handler(msg, process_name_step)
@@ -172,11 +213,45 @@ def deleted_id_material(message):
 @bot.message_handler(func=lambda message: message.text == 'Залишок по матеріалу')
 def send_remainder_material(message):
     text = DB_cursor.connection_to_db([('-1',)], 'show_material.sql')
-
+    # Видаляємо останні два елемента в кожному кортежі
+    data = [(tup[:-2]) for tup in text]
     header = ["ID", "Назва", "Розмір", "Натуральний", "Залишок", "Загальна ціна по залишку", "Ціна за шт"]
-    table = tabulate(text, headers=header, tablefmt="plain")
-
+    table = tabulate(data, headers=header, tablefmt="plain")
     bot.send_message(message.chat.id, f"```\n{table}\n```", parse_mode="Markdown")
+    msg = bot.send_message(message.chat.id, f"Введіть ID матеріалу для деталей, або введіть 'стоп'", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, process_quantity_step)
+
+
+def process_quantity_step(message):
+    input_text = message.text
+    if input_text.lower() == 'стоп':
+        list_for_database.clear()
+        return    
+    try:
+        input_text = int(message.text)
+        list_for_database.append(input_text)
+        result = DB_cursor.connection_to_db(tuple(list_for_database, ), 'show_material.sql')
+        bot.send_message(message.chat.id, 
+        
+f'''
+● Назва: {result[0][1]}
+● Розмір: {result[0][2]}
+● Натуральність: {result[0][3]}
+● Залишок: {result[0][4]}
+● Загальна вартість: {result[0][5]}
+● Вартість за 1 штуку: {result[0][6]}
+● Знак зодіаку: {result[0][7]}
+  був створений.''')
+        # Преобразование бинарных данных в байтовый поток
+        photo_stream = io.BytesIO(result[0][8])
+
+        # Отправка файла
+        bot.send_photo(message.chat.id, photo_stream)
+        msg = bot.send_message(message.chat.id, f"Введіть ID матеріалу для деталей, або введіть 'стоп'")
+        bot.register_next_step_handler(msg, process_quantity_step)
+    except ValueError:
+        msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
+        bot.register_next_step_handler(msg, process_quantity_step)
 
 
 # ----------------------------------------------------------------------------------------------------------------------------
