@@ -373,6 +373,92 @@ def asc_material_used(message, id_product, date_product):
             print(f"Произошла ошибка: {e}")
 
 
+# ----------------------------------------------------------------------------------------------------------------------------
+# Обработчик для кнопки "Закуп матеріалу"
+
+
+@bot.message_handler(func=lambda message: message.text == 'Закуп матеріалу')
+def material_purchased(message):
+    send_remainder_material(message, back = True)
+    msg = bot.send_message(message.chat.id, "ID Матеріалу:")
+    bot.register_next_step_handler(msg, process_id_purchased_step)
+
+
+def process_id_purchased_step(message):
+    input_text = message.text
+    if input_text.lower() == 'стоп':
+        list_for_database.clear()
+        return
+    try:
+        input_text = int(message.text)
+        list_for_database.append(input_text)
+        msg = bot.send_message(message.chat.id, f"Дата закупу dd mm yyyy")
+        bot.register_next_step_handler(msg, ask_question_purchased_date) 
+    except ValueError:
+        msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
+        bot.register_next_step_handler(msg, process_id_purchased_step)
+
+
+def ask_question_purchased_date(message):
+    input_text = message.text
+    if input_text.lower() == 'стоп':
+        list_for_database.clear()
+        return
+    date_pattern = r"^(0[1-9]|[12][0-9]|3[01]) (0[1-9]|1[0-2]) \d{4}$"
+    if not re.match(date_pattern, input_text):
+        msg = bot.send_message(message.chat.id, 'Формат дати введений не коректно. Спробуйте ще раз')
+        bot.register_next_step_handler(msg, ask_question_purchased_date)
+    else:
+        day, month, year = map(int, input_text.split())
+        formatted_date = f"{year:04d}-{month:02d}-{day:02d}"
+        print(formatted_date)
+        list_for_database.append(formatted_date)
+        msg = bot.send_message(message.chat.id, 'Кількість матеріалу')
+        print(list_for_database)
+        bot.register_next_step_handler(msg, quantity_material_purchased_step)
+
+
+def quantity_material_purchased_step(message):
+    input_text = message.text
+    if input_text.lower() == 'стоп':
+        list_for_database.clear()
+        return    
+    try:
+        input_text = int(message.text)
+        list_for_database.append(input_text)
+        msg = bot.send_message(message.chat.id, f"Вкажіть загальну ціну придбаного матеріалу")
+        bot.register_next_step_handler(msg, process_total_cost_step_purchased)
+    except ValueError:
+        msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
+        bot.register_next_step_handler(msg, quantity_material_purchased_step)
+
+
+def process_total_cost_step_purchased(message):
+    input_text = message.text
+    if input_text.lower() == 'стоп':
+        list_for_database.clear()
+        return    
+    try:
+        input_text = float(message.text)
+        list_for_database.append(input_text)
+        print(len(list_for_database))
+        material_purchased_id = DB_cursor.connection_to_db(tuple(list_for_database), 'created_purchased_material.sql')
+        DB_cursor.connection_to_db(material_purchased_id[0], 'update_purchased_material.sql')
+
+        print(material_purchased_id)
+        bot.send_message(message.chat.id, 
+f'''
+Матеріал був доданий!''')
+
+        list_for_database.clear()  # очистити список для наступного вводу
+        send_remainder_material(message, back = True)
+        msg = bot.send_message(message.chat.id, "ID Матеріалу:")  # повернутися до початкового кроку
+        bot.register_next_step_handler(msg, process_id_purchased_step)
+                                                                             
+    except ValueError:
+        msg = bot.send_message(message.chat.id, 'Введіть число. Спробуйте ще раз:')
+        bot.register_next_step_handler(msg, process_total_cost_step_purchased)
+
 
 
 
